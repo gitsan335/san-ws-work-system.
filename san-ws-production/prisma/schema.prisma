@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  worker    Worker?
+  auditLogs AuditLog[]
+  sessions  Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Worker {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  status    String   @default("ACTIVE")
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operations Operation[]
+  tasks      Task[]
+  expenses   Expense[]
+}
+
+model Seller {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  operations Operation[]
+}
+
+model VcfType {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  expectedContacts Int
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  operations Operation[]
+  tasks      Task[]
+}
+
+model PaymentRate {
+  id            String   @id @default(cuid())
+  effectiveFrom DateTime
+  perMemberRate Float
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([effectiveFrom, status])
+}
+
+model ExpenseType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses Expense[]
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  groupId   String
+  date      DateTime
+  status    String   @default("PENDING")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workerId  String
+  worker    Worker  @relation(fields: [workerId], references: [id])
+  vcfTypeId String
+  vcfType   VcfType @relation(fields: [vcfTypeId], references: [id])
+  operation Operation?
+
+  @@index([workerId, status])
+  @@index([groupId])
+}
+
+model Operation {
+  id                String   @id @default(cuid())
+  date              DateTime
+  groupId           String
+  groupCreationDate DateTime?
+  status            String
+  membersAdded      Int
+  expectedContacts  Int
+  successRate       Float
+  applicableRate    Float
+  workAmount        Float
+  isDemo            Boolean  @default(false)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workerId  String
+  worker    Worker  @relation(fields: [workerId], references: [id])
+  sellerId  String
+  seller    Seller  @relation(fields: [sellerId], references: [id])
+  vcfTypeId String
+  vcfType   VcfType @relation(fields: [vcfTypeId], references: [id])
+  taskId    String? @unique
+  task      Task?   @relation(fields: [taskId], references: [id])
+
+  @@index([date])
+  @@index([groupId])
+  @@index([workerId])
+  @@index([sellerId])
+  @@index([status])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime
+  description String
+  amount      Float
+  groupId     String?
+  reference   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  expenseTypeId String
+  expenseType   ExpenseType @relation(fields: [expenseTypeId], references: [id])
+  workerId      String?
+  worker        Worker?     @relation(fields: [workerId], references: [id])
+
+  @@index([date])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  entityType String?
+  entityId   String?
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+}
